@@ -552,7 +552,8 @@ async def clear_db():
 @app.post("/run")
 async def run(req: RunRequest):
     _pipeline_state.update({"status": "running", "current_agent": "researcher", "aborted": False})
-    result = run_pipeline(req.query)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, run_pipeline, req.query)
     _pipeline_state.update({"status": "idle", "current_agent": None, "last_trace": result["trace_id"]})
     await _broadcast("trace_complete", {"trace_id": result["trace_id"], "summary": result["summary"]})
     await _broadcast("pipeline_state", {"status": "idle"})
