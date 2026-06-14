@@ -202,12 +202,15 @@ def posture_panel():
 def stats_panel():
     s = get_stats()
     _sev_colors = {"critical": "#f87171", "high": "#fb923c", "medium": "#facc15", "low": "#86efac"}
-    sev_rows = "".join(
-        f'<div class="posture-row"><span class="posture-label">{sev}</span>'
-        f'<span class="posture-value" style="color:{_sev_colors.get(sev,\"#e4e4e7\")}">{count}</span></div>'
-        for sev in ["critical", "high", "medium", "low"]
-        if (count := s["by_severity"].get(sev, 0)) is not None
-    )
+    sev_rows_parts = []
+    for sev in ["critical", "high", "medium", "low"]:
+        count = s["by_severity"].get(sev, 0)
+        color = _sev_colors.get(sev, "#e4e4e7")
+        sev_rows_parts.append(
+            f'<div class="posture-row"><span class="posture-label">{sev}</span>'
+            f'<span class="posture-value" style="color:{color}">{count}</span></div>'
+        )
+    sev_rows = "".join(sev_rows_parts)
     agent_rows = "".join(
         f'<div class="posture-row"><span class="posture-label">{html.escape(agent)}</span>'
         f'<span class="posture-value">{count}</span></div>'
