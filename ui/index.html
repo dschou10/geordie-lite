@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Agent Activity Monitor</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
+    h1 { font-size: 1.2rem; color: #a0a0a0; margin-bottom: 20px; letter-spacing: 0.05em; }
+
+    .run-form { display: flex; gap: 8px; margin-bottom: 28px; }
+    .run-form input {
+      flex: 1; padding: 8px 12px; background: #1a1a1a; border: 1px solid #333;
+      color: #e0e0e0; font-family: monospace; font-size: 0.9rem; border-radius: 4px;
+    }
+    .run-form button {
+      padding: 8px 18px; background: #2a6496; border: none; color: #fff;
+      font-family: monospace; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+    }
+    .run-form button:hover { background: #3a74a6; }
+
+    #status { font-size: 0.8rem; color: #666; margin-bottom: 16px; min-height: 1.2em; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th { text-align: left; padding: 6px 10px; color: #666; border-bottom: 1px solid #222; }
+    td { padding: 6px 10px; border-bottom: 1px solid #1a1a1a; vertical-align: top; max-width: 320px; word-break: break-word; }
+    tr:hover td { background: #141414; }
+
+    .agent { color: #7ec8e3; }
+    .tool  { color: #b5e853; }
+    .ms    { color: #666; }
+    .ts    { color: #555; font-size: 0.75rem; }
+
+    .flag-yes { color: #ff6b6b; font-weight: bold; }
+    .flag-no  { color: #444; }
+
+    .trace-id { color: #555; font-size: 0.75rem; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>⬡ agent activity monitor</h1>
+
+  <form class="run-form"
+        hx-post="/run"
+        hx-target="#status"
+        hx-swap="innerHTML"
+        hx-on::after-request="htmx.trigger('#feed', 'refresh')">
+    <input type="text" name="query" placeholder="Enter a research query…" required>
+    <button type="submit">▶ Run</button>
+  </form>
+
+  <div id="status"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>time</th>
+        <th>trace</th>
+        <th>agent</th>
+        <th>event</th>
+        <th>tool</th>
+        <th>duration</th>
+        <th>risk</th>
+      </tr>
+    </thead>
+    <tbody id="feed"
+           hx-get="/events/rows"
+           hx-trigger="load, every 2s, refresh from:body"
+           hx-swap="innerHTML">
+    </tbody>
+  </table>
+
+  <script>
+    // Parse JSON from /run and show summary in status bar
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+      if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath === '/run') {
+        try {
+          const data = JSON.parse(evt.detail.xhr.responseText);
+          evt.detail.target.innerHTML =
+            '<span style="color:#b5e853">✓ trace ' + data.trace_id.slice(0,8) + '… — ' + data.summary + '</span>';
+        } catch(e) {}
+      }
+    });
+  </script>
+</body>
+</html>

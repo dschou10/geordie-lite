@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: geordie-lite
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn api.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
