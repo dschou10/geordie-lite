@@ -9,10 +9,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0f; color: #d4d4d8; padding: 32px 40px; }
 
-    h1 {
-      font-size: 1rem; color: #52525b; margin-bottom: 28px;
-      letter-spacing: 0.12em; text-transform: uppercase;
-    }
+    h1 { font-size: 1rem; color: #52525b; margin-bottom: 28px; letter-spacing: 0.12em; text-transform: uppercase; }
 
     .run-form { display: flex; gap: 10px; margin-bottom: 8px; }
     .run-form input {
@@ -47,11 +44,9 @@
       text-align: left; padding: 8px 12px; color: #3f3f46;
       font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
     }
-    td {
-      padding: 9px 12px; border-bottom: 1px solid #111118;
-      vertical-align: middle; white-space: nowrap;
-    }
+    td { padding: 9px 12px; border-bottom: 1px solid #111118; vertical-align: middle; white-space: nowrap; }
     tr:hover td { background: #0f0f1a; }
+    .violation-row:hover td { background: #110f1a; cursor: pointer; }
 
     .agent    { color: #60a5fa; }
     .tool     { color: #86efac; }
@@ -59,22 +54,44 @@
     .ts       { color: #3f3f46; font-size: 0.75rem; }
     .trace-id { color: #3f3f46; font-size: 0.75rem; }
     .standard { color: #a78bfa; font-size: 0.7rem; }
-
     .flag-yes { color: #f87171; font-weight: 600; }
     .flag-no  { color: #27272a; }
 
-    /* Posture panel */
-    .posture-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
-    .agent-card {
-      background: #111118; border: 1px solid #1e1e2e; border-radius: 8px; padding: 20px;
+    /* Detail inspector */
+    .detail-row td { padding: 0; border-bottom: 1px solid #1e1e2e; }
+    .detail-box {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+      background: #1e1e2e; border-top: 1px solid #1e1e2e;
     }
+    .detail-col { background: #0d0d18; padding: 14px 16px; }
+    .detail-label { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: #3f3f46; margin-bottom: 8px; }
+    .detail-col pre {
+      font-size: 0.75rem; color: #a1a1aa; white-space: pre-wrap; word-break: break-word;
+      max-height: 180px; overflow-y: auto;
+    }
+
+    /* Violations filter bar */
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+    .filter-bar span { font-size: 0.7rem; color: #52525b; letter-spacing: 0.08em; text-transform: uppercase; }
+    .sev-btn {
+      padding: 4px 12px; border-radius: 4px; border: 1px solid #27272a; background: none;
+      font-family: inherit; font-size: 0.72rem; cursor: pointer; color: #71717a; transition: all 0.15s;
+    }
+    .sev-btn:hover, .sev-btn.active { border-color: #3b82f6; color: #e4e4e7; background: #1e1e3a; }
+    .sev-btn.critical { border-color: #f87171; color: #f87171; }
+    .sev-btn.high     { border-color: #fb923c; color: #fb923c; }
+    .sev-btn.medium   { border-color: #facc15; color: #facc15; }
+    .sev-btn.low      { border-color: #86efac; color: #86efac; }
+
+    /* Posture & stats */
+    .posture-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    .agent-card { background: #111118; border: 1px solid #1e1e2e; border-radius: 8px; padding: 20px; }
     .agent-card h3 { color: #60a5fa; font-size: 0.85rem; margin-bottom: 14px; letter-spacing: 0.06em; }
     .posture-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.78rem; }
     .posture-label { color: #52525b; }
     .posture-value { color: #e4e4e7; }
     .posture-value.green { color: #86efac; }
     .posture-value.purple { color: #a78bfa; }
-
     .standards-table { margin-top: 8px; }
     .standards-table th { color: #3f3f46; }
   </style>
@@ -87,7 +104,7 @@
         hx-target="#status"
         hx-swap="innerHTML"
         hx-ext="json-enc"
-        hx-on::after-request="htmx.trigger('#feed', 'refresh')">
+        hx-on::after-request="htmx.trigger(document.body, 'refresh')">
     <input type="text" name="query" placeholder="Enter a research query…" required>
     <button type="submit">▶ Run</button>
   </form>
@@ -96,23 +113,19 @@
 
   <div class="tabs">
     <button class="tab active" onclick="showTab('events', this)">Event Feed</button>
+    <button class="tab" onclick="showTab('traces', this)">Traces</button>
+    <button class="tab" onclick="showTab('violations', this)">Violations</button>
     <button class="tab" onclick="showTab('posture', this)">Posture</button>
     <button class="tab" onclick="showTab('stats', this)">Stats</button>
   </div>
 
+  <!-- Event Feed -->
   <div id="events" class="panel active">
     <table>
       <thead>
         <tr>
-          <th>time</th>
-          <th>trace</th>
-          <th>agent</th>
-          <th>event</th>
-          <th>tool</th>
-          <th>duration</th>
-          <th>severity</th>
-          <th>risk</th>
-          <th>standard</th>
+          <th>time</th><th>trace</th><th>agent</th><th>event</th>
+          <th>tool</th><th>duration</th><th>severity</th><th>risk</th><th>standard</th>
         </tr>
       </thead>
       <tbody id="feed"
@@ -123,22 +136,59 @@
     </table>
   </div>
 
+  <!-- Traces rollup -->
+  <div id="traces" class="panel">
+    <table>
+      <thead>
+        <tr><th>started</th><th>trace</th><th>events</th><th>severity</th><th>action</th></tr>
+      </thead>
+      <tbody id="trace-feed"
+             hx-get="/traces/rows"
+             hx-trigger="load, every 5s, refresh from:body"
+             hx-swap="innerHTML">
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Violations log -->
+  <div id="violations" class="panel">
+    <div class="filter-bar">
+      <span>filter:</span>
+      <button class="sev-btn active" onclick="filterViolations('', this)">all</button>
+      <button class="sev-btn critical" onclick="filterViolations('critical', this)">critical</button>
+      <button class="sev-btn high" onclick="filterViolations('high', this)">high</button>
+      <button class="sev-btn medium" onclick="filterViolations('medium', this)">medium</button>
+      <button class="sev-btn low" onclick="filterViolations('low', this)">low</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>time</th><th>trace</th><th>agent</th><th>event</th>
+          <th>tool</th><th>duration</th><th>severity</th><th>risk</th><th>standard</th>
+        </tr>
+      </thead>
+      <tbody id="violations-feed"
+             hx-get="/events/violations"
+             hx-trigger="load, refresh from:body"
+             hx-swap="innerHTML">
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Posture -->
   <div id="posture" class="panel">
     <div id="posture-content"
          hx-get="/posture/panel"
          hx-trigger="load"
-         hx-swap="innerHTML">
-      Loading…
-    </div>
+         hx-swap="innerHTML">Loading…</div>
   </div>
 
+  <!-- Stats -->
   <div id="stats" class="panel">
     <div id="stats-content"
          hx-get="/stats/panel"
-         hx-trigger="load, every 5s"
-         hx-swap="innerHTML">
-      Loading…
-    </div>
+         hx-trigger="load, every 5s, refresh from:body"
+         hx-swap="innerHTML">Loading…</div>
   </div>
 
   <script>
@@ -147,6 +197,18 @@
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById(id).classList.add('active');
       btn.classList.add('active');
+    }
+
+    function filterViolations(severity, btn) {
+      document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const url = severity ? `/events/violations?severity=${severity}` : '/events/violations';
+      htmx.ajax('GET', url, {target: '#violations-feed', swap: 'innerHTML'});
+    }
+
+    function toggleDetail(rowId) {
+      const row = document.getElementById(rowId);
+      if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
     }
 
     document.body.addEventListener('htmx:afterRequest', function(evt) {

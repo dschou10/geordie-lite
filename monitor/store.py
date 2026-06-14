@@ -121,6 +121,52 @@ def get_baseline(agent_name: str, event_type: str, exclude_trace_id: Optional[st
     return row[0] if row and row[0] is not None else None
 
 
+def get_trace_rollup(trace_id: str) -> dict:
+    """Return a single worst-case verdict across all events in a trace."""
+    from monitor.risk import SEVERITY_ORDER
+    events = get_trace(trace_id)
+    flagged = [e for e in events if e["flagged"]]
+    if not flagged:
+        return {"trace_id": trace_id, "flagged": False, "severity": None, "reasons": [], "action": "log"}
+    worst = max(flagged, key=lambda e: SEVERITY_ORDER.index(e["severity"]) if e.get("severity") in SEVERITY_ORDER else -1)
+    return {
+        "trace_id": trace_id,
+        "flagged": True,
+        "severity": worst.get("severity"),
+        "reasons": [e["flag_reason"] for e in flagged if e.get("flag_reason")],
+        "action": "block" if any(e.get("action") == "block" for e in flagged) else "flag",
+    }
+
+
+def get_traces(limit: int = 50) -> list[dict]:
+    """Return one row per trace (most recent event per trace), newest first."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT trace_id, MIN(timestamp) as started_at, COUNT(*) as event_count,
+                   SUM(flagged) as flag_count, MAX(action) as worst_action
+            FROM events
+            GROUP BY trace_id
+            ORDER BY started_at DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_flagged_events(severity: Optional[str] = None, limit: int = 100) -> list[dict]:
+    with get_conn() as conn:
+        if severity:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE flagged=1 AND severity=? ORDER BY id DESC LIMIT ?",
+                (severity, limit)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE flagged=1 ORDER BY id DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
 def get_trace(trace_id: str) -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(

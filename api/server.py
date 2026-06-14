@@ -3,11 +3,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
-from monitor.store import get_events, get_trace, get_stats
+from monitor.store import get_events, get_trace, get_stats, get_flagged_events, get_traces, get_trace_rollup
 from monitor.risk import _ALLOWED_TOOLS, _STANDARDS
 from agents.pipeline import run_pipeline
 import os
 import html
+import json
 
 app = FastAPI(title="Agent Activity Monitor")
 app.mount("/ui", StaticFiles(directory=Path(__file__).parent.parent / "ui"), name="ui")
@@ -63,6 +64,75 @@ def event_rows(limit: int = 100):
           <td>{sev_cell}</td>
           <td>{flag_cell}</td>
           <td>{std_cell}</td>
+        </tr>""")
+    return "\n".join(parts)
+
+
+@app.get("/events/violations", response_class=HTMLResponse)
+def violation_rows(severity: str = ""):
+    rows = get_flagged_events(severity=severity or None, limit=100)
+    if not rows:
+        return '<tr><td colspan="9" style="color:#444;padding:20px 10px;">No violations found.</td></tr>'
+    _sev_colors = {"critical": "#f87171", "high": "#fb923c", "medium": "#facc15", "low": "#86efac"}
+    parts = []
+    for e in rows:
+        ts = e["timestamp"][:19].replace("T", " ")
+        trace = e["trace_id"][:8] + "…"
+        sev = e.get("severity", "")
+        sev_color = _sev_colors.get(sev, "#52525b")
+        sev_cell = f'<span style="color:{sev_color};font-weight:600">{sev}</span>'
+        action = e.get("action", "log")
+        action_color = "#f87171" if action == "block" else "#52525b"
+        standards = e.get("standards") or []
+        std_cell = " ".join(f'<span class="standard">{html.escape(s)}</span>' for s in standards) or "—"
+        inp = json.dumps(e.get("input") or {}, indent=2)
+        out = json.dumps(e.get("output") or {}, indent=2)
+        row_id = f"row-{e['id']}"
+        parts.append(f"""
+        <tr class="violation-row" onclick="toggleDetail('{row_id}')" style="cursor:pointer">
+          <td class="ts">{ts}</td>
+          <td class="trace-id">{trace}</td>
+          <td class="agent">{html.escape(e['agent_name'])}</td>
+          <td>{html.escape(e['event_type'])}</td>
+          <td class="tool">{html.escape(e['tool'] or '—')}</td>
+          <td class="ms">{f"{e['duration_ms']:.0f}ms" if e['duration_ms'] else "—"}</td>
+          <td>{sev_cell}</td>
+          <td><span class="flag-yes">⚠ {html.escape(e['flag_reason'] or '')}</span></td>
+          <td>{std_cell}</td>
+        </tr>
+        <tr id="{row_id}" class="detail-row" style="display:none">
+          <td colspan="9">
+            <div class="detail-box">
+              <div class="detail-col"><div class="detail-label">input</div><pre>{html.escape(inp)}</pre></div>
+              <div class="detail-col"><div class="detail-label">output</div><pre>{html.escape(out)}</pre></div>
+            </div>
+          </td>
+        </tr>""")
+    return "\n".join(parts)
+
+
+@app.get("/traces/rows", response_class=HTMLResponse)
+def trace_rows():
+    _sev_colors = {"critical": "#f87171", "high": "#fb923c", "medium": "#facc15", "low": "#86efac"}
+    traces = get_traces(limit=50)
+    if not traces:
+        return '<tr><td colspan="5" style="color:#444;padding:20px 10px;">No traces yet.</td></tr>'
+    parts = []
+    for t in traces:
+        rollup = get_trace_rollup(t["trace_id"])
+        sev = rollup.get("severity") or ""
+        sev_color = _sev_colors.get(sev, "#3f3f46")
+        sev_cell = f'<span style="color:{sev_color};font-weight:600">{sev}</span>' if sev else '<span class="flag-no">clean</span>'
+        action = rollup.get("action", "log")
+        action_color = "#f87171" if action == "block" else "#52525b"
+        ts = t["started_at"][:19].replace("T", " ")
+        parts.append(f"""
+        <tr>
+          <td class="ts">{ts}</td>
+          <td class="trace-id">{t['trace_id'][:8]}…</td>
+          <td class="ms">{t['event_count']} events</td>
+          <td>{sev_cell}</td>
+          <td><span style="color:{action_color}">{action}</span></td>
         </tr>""")
     return "\n".join(parts)
 
