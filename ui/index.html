@@ -6,36 +6,49 @@
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: monospace; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
-    h1 { font-size: 1.2rem; color: #a0a0a0; margin-bottom: 20px; letter-spacing: 0.05em; }
+    body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0f; color: #d4d4d8; padding: 32px 40px; }
 
-    .run-form { display: flex; gap: 8px; margin-bottom: 28px; }
+    h1 {
+      font-size: 1rem; color: #52525b; margin-bottom: 28px;
+      letter-spacing: 0.12em; text-transform: uppercase;
+    }
+
+    .run-form { display: flex; gap: 10px; margin-bottom: 8px; }
     .run-form input {
-      flex: 1; padding: 8px 12px; background: #1a1a1a; border: 1px solid #333;
-      color: #e0e0e0; font-family: monospace; font-size: 0.9rem; border-radius: 4px;
+      flex: 1; padding: 10px 14px; background: #111118; border: 1px solid #27272a;
+      color: #e4e4e7; font-family: inherit; font-size: 0.875rem; border-radius: 6px;
+      outline: none; transition: border-color 0.15s;
     }
+    .run-form input:focus { border-color: #3b82f6; }
     .run-form button {
-      padding: 8px 18px; background: #2a6496; border: none; color: #fff;
-      font-family: monospace; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+      padding: 10px 20px; background: #1d4ed8; border: none; color: #fff;
+      font-family: inherit; font-size: 0.875rem; border-radius: 6px; cursor: pointer;
+      letter-spacing: 0.04em; transition: background 0.15s;
     }
-    .run-form button:hover { background: #3a74a6; }
+    .run-form button:hover { background: #2563eb; }
 
-    #status { font-size: 0.8rem; color: #666; margin-bottom: 16px; min-height: 1.2em; }
+    #status { font-size: 0.78rem; color: #52525b; margin-bottom: 24px; min-height: 1.4em; }
 
-    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-    th { text-align: left; padding: 6px 10px; color: #666; border-bottom: 1px solid #222; }
-    td { padding: 6px 10px; border-bottom: 1px solid #1a1a1a; vertical-align: top; max-width: 320px; word-break: break-word; }
-    tr:hover td { background: #141414; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    thead tr { border-bottom: 1px solid #1e1e2e; }
+    th {
+      text-align: left; padding: 8px 12px; color: #3f3f46;
+      font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+    }
+    td {
+      padding: 9px 12px; border-bottom: 1px solid #111118;
+      vertical-align: middle; white-space: nowrap;
+    }
+    tr:hover td { background: #0f0f1a; }
 
-    .agent { color: #7ec8e3; }
-    .tool  { color: #b5e853; }
-    .ms    { color: #666; }
-    .ts    { color: #555; font-size: 0.75rem; }
+    .agent    { color: #60a5fa; }
+    .tool     { color: #86efac; }
+    .ms       { color: #52525b; }
+    .ts       { color: #3f3f46; font-size: 0.75rem; }
+    .trace-id { color: #3f3f46; font-size: 0.75rem; }
 
-    .flag-yes { color: #ff6b6b; font-weight: bold; }
-    .flag-no  { color: #444; }
-
-    .trace-id { color: #555; font-size: 0.75rem; font-family: monospace; }
+    .flag-yes { color: #f87171; font-weight: 600; }
+    .flag-no  { color: #27272a; }
   </style>
 </head>
 <body>
