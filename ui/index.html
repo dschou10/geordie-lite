@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Agent Activity Monitor</title>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/json-enc.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0f; color: #d4d4d8; padding: 32px 40px; }
@@ -58,6 +59,7 @@
         hx-post="/run"
         hx-target="#status"
         hx-swap="innerHTML"
+        hx-ext="json-enc"
         hx-on::after-request="htmx.trigger('#feed', 'refresh')">
     <input type="text" name="query" placeholder="Enter a research query…" required>
     <button type="submit">▶ Run</button>
@@ -79,7 +81,7 @@
     </thead>
     <tbody id="feed"
            hx-get="/events/rows"
-           hx-trigger="load, every 2s, refresh from:body"
+           hx-trigger="load, every 5s, refresh from:body"
            hx-swap="innerHTML">
     </tbody>
   </table>

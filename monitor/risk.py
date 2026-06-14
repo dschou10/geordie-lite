@@ -91,6 +91,16 @@ def _check_unexpected_tool(event: dict) -> tuple[bool, str]:
     return False, ""
 
 
+_COMMON_WORDS = {
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was",
+    "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "may",
+    "new", "now", "old", "see", "two", "way", "who", "boy", "did", "she", "use",
+    "summary", "findings", "result", "results", "overview", "recent", "expert",
+    "analysis", "topic", "developments", "according", "based", "these", "their",
+    "this", "that", "with", "from", "they", "been", "have", "more", "also",
+}
+
+
 def _check_ungrounded_output(event: dict) -> tuple[bool, str]:
     """Flag summarizer output that contains named entities not present in its input."""
     if event.get("agent_name") != "summarizer" or event.get("event_type") != "llm_call":
@@ -98,10 +108,12 @@ def _check_ungrounded_output(event: dict) -> tuple[bool, str]:
     input_val = event.get("input") or {}
     results = input_val.get("results", [])
     input_text = " ".join(_extract_text(r) for r in results).lower()
-    output_text = _extract_text((event.get("output") or {}).get("summary", "")).lower()
-    # Look for capitalised words (likely named entities) in output absent from input
-    named_entities = re.findall(r"\b[A-Z][a-z]{2,}\b", _extract_text((event.get("output") or {}).get("summary", "")))
-    ungrounded = [w for w in named_entities if w.lower() not in input_text]
+    summary = _extract_text((event.get("output") or {}).get("summary", ""))
+    named_entities = re.findall(r"\b[A-Z][a-z]{2,}\b", summary)
+    ungrounded = [
+        w for w in named_entities
+        if w.lower() not in input_text and w.lower() not in _COMMON_WORDS
+    ]
     if ungrounded:
         sample = ", ".join(sorted(set(ungrounded))[:3])
         return True, f"ungrounded output: terms not in source ({sample})"

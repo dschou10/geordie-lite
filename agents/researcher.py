@@ -22,7 +22,7 @@ def run(query: str, trace_id: str) -> list[str]:
     results = _search(query)
     duration_ms = (time.monotonic() - start) * 1000
 
-    tracer.emit(
+    event = tracer.emit(
         trace_id=trace_id,
         agent_name="researcher",
         event_type="tool_call",
@@ -31,4 +31,4 @@ def run(query: str, trace_id: str) -> list[str]:
         output={"results": results},
         duration_ms=duration_ms,
     )
-    return results
+    return results, event
