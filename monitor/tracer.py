@@ -1,8 +1,16 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Callable
+
 from . import risk, store
 
 store.init_db()
+
+# Optional hook called after each event is stored. Set by the API layer.
+_on_event: Optional[Callable[[dict], None]] = None
+
+def set_event_hook(fn: Callable[[dict], None]) -> None:
+    global _on_event
+    _on_event = fn
 
 
 def emit(
@@ -32,4 +40,6 @@ def emit(
     event["action"] = verdict.get("action", "log")
     event["standards"] = verdict.get("standards", [])
     store.insert_event(event)
+    if _on_event:
+        _on_event(event)
     return event

@@ -108,6 +108,13 @@
     <input type="text" name="query" placeholder="Enter a research query…" required>
     <button type="submit">▶ Run</button>
   </form>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <button class="sev-btn"
+            hx-post="/clear"
+            hx-target="#status"
+            hx-swap="innerHTML"
+            style="font-size:0.72rem">⊘ clear events</button>
+  </div>
 
   <div id="status"></div>
 
@@ -115,6 +122,7 @@
     <button class="tab active" onclick="showTab('events', this)">Event Feed</button>
     <button class="tab" onclick="showTab('traces', this)">Traces</button>
     <button class="tab" onclick="showTab('violations', this)">Violations</button>
+    <button class="tab" onclick="showTab('graph', this)">Graph</button>
     <button class="tab" onclick="showTab('posture', this)">Posture</button>
     <button class="tab" onclick="showTab('stats', this)">Stats</button>
   </div>
@@ -159,6 +167,10 @@
       <button class="sev-btn high" onclick="filterViolations('high', this)">high</button>
       <button class="sev-btn medium" onclick="filterViolations('medium', this)">medium</button>
       <button class="sev-btn low" onclick="filterViolations('low', this)">low</button>
+      <span style="margin-left:auto;display:flex;gap:6px">
+        <a id="export-json" href="/export/violations.json" class="sev-btn" style="text-decoration:none">↓ JSON</a>
+        <a id="export-csv" href="/export/violations.csv" class="sev-btn" style="text-decoration:none">↓ CSV</a>
+      </span>
     </div>
     <table>
       <thead>
@@ -173,6 +185,14 @@
              hx-swap="innerHTML">
       </tbody>
     </table>
+  </div>
+
+  <!-- Graph -->
+  <div id="graph" class="panel">
+    <div id="graph-content"
+         hx-get="/graph/panel"
+         hx-trigger="load, every 1s"
+         hx-swap="innerHTML">Loading…</div>
   </div>
 
   <!-- Posture -->
@@ -202,13 +222,26 @@
     function filterViolations(severity, btn) {
       document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      const url = severity ? `/events/violations?severity=${severity}` : '/events/violations';
-      htmx.ajax('GET', url, {target: '#violations-feed', swap: 'innerHTML'});
+      const qs = severity ? `?severity=${severity}` : '';
+      htmx.ajax('GET', `/events/violations${qs}`, {target: '#violations-feed', swap: 'innerHTML'});
+      document.getElementById('export-json').href = `/export/violations.json${qs}`;
+      document.getElementById('export-csv').href = `/export/violations.csv${qs}`;
     }
 
     function toggleDetail(rowId) {
       const row = document.getElementById(rowId);
       if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+
+    function toggleTimeline(rowId, traceId) {
+      const row = document.getElementById(rowId);
+      if (!row) return;
+      if (row.style.display !== 'none') { row.style.display = 'none'; return; }
+      row.style.display = 'table-row';
+      if (!row.dataset.loaded) {
+        htmx.ajax('GET', `/traces/${traceId}/timeline`, {target: `#${rowId} td`, swap: 'innerHTML'});
+        row.dataset.loaded = '1';
+      }
     }
 
     document.body.addEventListener('htmx:afterRequest', function(evt) {
@@ -223,6 +256,25 @@
         } catch(e) {}
       }
     });
+
+    // SSE: refresh feed panels instantly on server push
+    (function connectSSE() {
+      const es = new EventSource('/stream');
+      es.addEventListener('trace_complete', () => {
+        htmx.trigger('#feed', 'refresh');
+        htmx.trigger('#trace-feed', 'refresh');
+        htmx.trigger('#stats-content', 'refresh');
+        htmx.trigger('#graph-content', 'refresh');
+      });
+      es.addEventListener('flagged_event', () => {
+        htmx.trigger('#violations-feed', 'refresh');
+        htmx.trigger('#stats-content', 'refresh');
+      });
+      es.addEventListener('pipeline_state', () => {
+        htmx.trigger('#graph-content', 'refresh');
+      });
+      es.onerror = () => setTimeout(connectSSE, 3000);
+    })();
   </script>
 </body>
 </html>

@@ -71,12 +71,22 @@ def insert_event(event: dict) -> None:
         )
 
 
-def get_events(limit: int = 100) -> list[dict]:
+def get_events(limit: int = 25, offset: int = 0) -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,)
+            "SELECT * FROM events ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)
         ).fetchall()
     return [_row_to_dict(r) for r in rows]
+
+
+def count_events() -> int:
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+
+
+def clear_events() -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM events")
 
 
 def get_stats() -> dict:

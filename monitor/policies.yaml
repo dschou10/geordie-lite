@@ -5,6 +5,7 @@ policies:
     condition: prompt_injection
     severity: critical
     action: block
+    # webhook_url: https://hooks.slack.com/your-url-here
 
   - id: no-pii-in-outputs
     description: Flag any PII detected in agent inputs or outputs
