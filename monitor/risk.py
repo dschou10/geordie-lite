@@ -1,5 +1,5 @@
 import re
-from .store import get_trace
+from .store import get_trace, get_baseline
 
 _PII_PATTERNS = [
     (re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"), "email address"),
@@ -8,6 +8,8 @@ _PII_PATTERNS = [
 
 _SLOW_THRESHOLD_MS = 5000
 _MAX_TOOL_CALLS = 3
+_BASELINE_ANOMALY_MULTIPLIER = 3.0
+_BASELINE_MIN_SAMPLES = 5  # don't flag until we have enough history
 
 _INJECTION_PATTERNS = re.compile(
     r"ignore (previous|prior|all) instructions?|"
@@ -28,20 +30,37 @@ _ALLOWED_TOOLS: dict[str, set[str]] = {
 }
 
 
+# Maps rule name → compliance standard reference
+_STANDARDS = {
+    "pii":              "NIST PR.DS-5",
+    "slow":             "internal SLO",
+    "tool_repetition":  "OWASP LLM07",
+    "prompt_injection": "OWASP LLM01",
+    "unexpected_tool":  "OWASP LLM08",
+    "ungrounded":       "OWASP LLM09",
+    "baseline_anomaly": "internal baseline",
+}
+
+
 def evaluate(event: dict) -> dict:
-    """Return {"flagged": bool, "reason": str | None} for a single event."""
+    """Return {"flagged": bool, "reason": str | None, "standards": list[str]} for a single event."""
     checks = [
-        _check_pii(event),
-        _check_slow(event),
-        _check_tool_repetition(event),
-        _check_prompt_injection(event),
-        _check_unexpected_tool(event),
-        _check_ungrounded_output(event),
+        ("pii",              _check_pii(event)),
+        ("slow",             _check_slow(event)),
+        ("tool_repetition",  _check_tool_repetition(event)),
+        ("prompt_injection", _check_prompt_injection(event)),
+        ("unexpected_tool",  _check_unexpected_tool(event)),
+        ("ungrounded",       _check_ungrounded_output(event)),
+        ("baseline_anomaly", _check_baseline_anomaly(event)),
     ]
-    failures = [reason for flagged, reason in checks if flagged]
+    failures = [(name, reason) for name, (flagged, reason) in checks if flagged]
     if failures:
-        return {"flagged": True, "reason": "; ".join(failures)}
-    return {"flagged": False, "reason": None}
+        return {
+            "flagged": True,
+            "reason": "; ".join(r for _, r in failures),
+            "standards": [_STANDARDS[name] for name, _ in failures],
+        }
+    return {"flagged": False, "reason": None, "standards": []}
 
 
 def _check_pii(event: dict) -> tuple[bool, str]:
@@ -88,6 +107,20 @@ def _check_unexpected_tool(event: dict) -> tuple[bool, str]:
     allowed = _ALLOWED_TOOLS.get(agent)
     if allowed is not None and tool not in allowed:
         return True, f"unexpected tool '{tool}' for agent '{agent}'"
+    return False, ""
+
+
+def _check_baseline_anomaly(event: dict) -> tuple[bool, str]:
+    duration = event.get("duration_ms")
+    if duration is None:
+        return False, ""
+    agent = event.get("agent_name")
+    event_type = event.get("event_type")
+    baseline = get_baseline(agent, event_type, exclude_trace_id=event.get("trace_id"))
+    if baseline is None or baseline == 0:
+        return False, ""
+    if duration > baseline * _BASELINE_ANOMALY_MULTIPLIER:
+        return True, f"duration {duration:.0f}ms is {duration/baseline:.1f}x above baseline ({baseline:.0f}ms avg)"
     return False, ""
 
 

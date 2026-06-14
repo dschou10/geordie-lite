@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "geordie-lite API",
+      "runtimeExecutable": "/usr/bin/python3",
+      "runtimeArgs": ["-m", "uvicorn", "api.server:app", "--reload", "--port", "8123"],
+      "port": 8123,
+      "autoPort": false
+    }
+  ]
+}

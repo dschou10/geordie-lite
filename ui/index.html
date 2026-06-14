@@ -28,7 +28,18 @@
     }
     .run-form button:hover { background: #2563eb; }
 
-    #status { font-size: 0.78rem; color: #52525b; margin-bottom: 24px; min-height: 1.4em; }
+    #status { font-size: 0.78rem; color: #52525b; margin-bottom: 16px; min-height: 1.4em; }
+
+    .tabs { display: flex; gap: 2px; margin-bottom: 24px; border-bottom: 1px solid #1e1e2e; }
+    .tab {
+      padding: 8px 16px; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+      color: #52525b; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      background: none; border-top: none; border-left: none; border-right: none; font-family: inherit;
+    }
+    .tab.active { color: #e4e4e7; border-bottom-color: #3b82f6; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
     thead tr { border-bottom: 1px solid #1e1e2e; }
@@ -47,9 +58,25 @@
     .ms       { color: #52525b; }
     .ts       { color: #3f3f46; font-size: 0.75rem; }
     .trace-id { color: #3f3f46; font-size: 0.75rem; }
+    .standard { color: #a78bfa; font-size: 0.7rem; }
 
     .flag-yes { color: #f87171; font-weight: 600; }
     .flag-no  { color: #27272a; }
+
+    /* Posture panel */
+    .posture-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    .agent-card {
+      background: #111118; border: 1px solid #1e1e2e; border-radius: 8px; padding: 20px;
+    }
+    .agent-card h3 { color: #60a5fa; font-size: 0.85rem; margin-bottom: 14px; letter-spacing: 0.06em; }
+    .posture-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.78rem; }
+    .posture-label { color: #52525b; }
+    .posture-value { color: #e4e4e7; }
+    .posture-value.green { color: #86efac; }
+    .posture-value.purple { color: #a78bfa; }
+
+    .standards-table { margin-top: 8px; }
+    .standards-table th { color: #3f3f46; }
   </style>
 </head>
 <body>
@@ -67,33 +94,59 @@
 
   <div id="status"></div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>time</th>
-        <th>trace</th>
-        <th>agent</th>
-        <th>event</th>
-        <th>tool</th>
-        <th>duration</th>
-        <th>risk</th>
-      </tr>
-    </thead>
-    <tbody id="feed"
-           hx-get="/events/rows"
-           hx-trigger="load, every 5s, refresh from:body"
-           hx-swap="innerHTML">
-    </tbody>
-  </table>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('events', this)">Event Feed</button>
+    <button class="tab" onclick="showTab('posture', this)">Posture</button>
+  </div>
+
+  <div id="events" class="panel active">
+    <table>
+      <thead>
+        <tr>
+          <th>time</th>
+          <th>trace</th>
+          <th>agent</th>
+          <th>event</th>
+          <th>tool</th>
+          <th>duration</th>
+          <th>risk</th>
+          <th>standard</th>
+        </tr>
+      </thead>
+      <tbody id="feed"
+             hx-get="/events/rows"
+             hx-trigger="load, every 5s, refresh from:body"
+             hx-swap="innerHTML">
+      </tbody>
+    </table>
+  </div>
+
+  <div id="posture" class="panel">
+    <div id="posture-content"
+         hx-get="/posture/panel"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      Loading…
+    </div>
+  </div>
 
   <script>
-    // Parse JSON from /run and show summary in status bar
+    function showTab(id, btn) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      btn.classList.add('active');
+    }
+
     document.body.addEventListener('htmx:afterRequest', function(evt) {
       if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath === '/run') {
         try {
           const data = JSON.parse(evt.detail.xhr.responseText);
+          const aborted = data.summary.startsWith('[aborted');
+          const color = aborted ? '#f87171' : '#86efac';
+          const icon = aborted ? '✕' : '✓';
           evt.detail.target.innerHTML =
-            '<span style="color:#b5e853">✓ trace ' + data.trace_id.slice(0,8) + '… — ' + data.summary + '</span>';
+            `<span style="color:${color}">${icon} trace ${data.trace_id.slice(0,8)}… — ${data.summary}</span>`;
         } catch(e) {}
       }
     });

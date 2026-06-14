@@ -4,9 +4,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
 from monitor.store import get_events, get_trace
+from monitor.risk import _ALLOWED_TOOLS, _STANDARDS
 from agents.pipeline import run_pipeline
-import html
 import os
+import html
 
 app = FastAPI(title="Agent Activity Monitor")
 app.mount("/ui", StaticFiles(directory=Path(__file__).parent.parent / "ui"), name="ui")
@@ -30,7 +31,7 @@ def events(limit: int = 100):
 def event_rows(limit: int = 100):
     rows = get_events(limit=limit)
     if not rows:
-        return '<tr><td colspan="7" style="color:#444;padding:20px 10px;">No events yet — run a query above.</td></tr>'
+        return '<tr><td colspan="8" style="color:#444;padding:20px 10px;">No events yet — run a query above.</td></tr>'
     parts = []
     for e in rows:
         ts = e["timestamp"][:19].replace("T", " ")
@@ -41,6 +42,8 @@ def event_rows(limit: int = 100):
             else '<span class="flag-no">—</span>'
         )
         dur = f'{e["duration_ms"]:.0f}ms' if e["duration_ms"] is not None else "—"
+        standards = e.get("standards") or []
+        std_cell = " ".join(f'<span class="standard">{html.escape(s)}</span>' for s in standards) or '<span class="flag-no">—</span>'
         parts.append(f"""
         <tr>
           <td class="ts">{ts}</td>
@@ -50,6 +53,7 @@ def event_rows(limit: int = 100):
           <td class="tool">{html.escape(e['tool'] or '—')}</td>
           <td class="ms">{dur}</td>
           <td>{flag_cell}</td>
+          <td>{std_cell}</td>
         </tr>""")
     return "\n".join(parts)
 
@@ -60,6 +64,59 @@ def trace(trace_id: str):
     if not events:
         raise HTTPException(status_code=404, detail="Trace not found")
     return events
+
+
+@app.get("/posture")
+def posture():
+    model = "claude-haiku-4-5-20251001" if os.environ.get("ANTHROPIC_API_KEY") else "mock-llm"
+    return {
+        "agents": [
+            {
+                "name": "researcher",
+                "allowed_tools": sorted(_ALLOWED_TOOLS.get("researcher", [])),
+                "model": None,
+                "enforcement": "abort pipeline on prompt injection",
+            },
+            {
+                "name": "summarizer",
+                "allowed_tools": sorted(_ALLOWED_TOOLS.get("summarizer", [])),
+                "model": model,
+                "enforcement": "flag unexpected tool usage",
+            },
+        ],
+        "risk_standards": _STANDARDS,
+    }
+
+
+@app.get("/posture/panel", response_class=HTMLResponse)
+def posture_panel():
+    model = "claude-haiku-4-5-20251001" if os.environ.get("ANTHROPIC_API_KEY") else "mock-llm"
+    agents = [
+        {"name": "researcher", "model": "—", "enforcement": "abort on prompt injection"},
+        {"name": "summarizer", "model": model, "enforcement": "flag unexpected tool"},
+    ]
+    cards = ""
+    for a in agents:
+        allowed = ", ".join(sorted(_ALLOWED_TOOLS.get(a["name"], [])))
+        cards += f"""
+        <div class="agent-card">
+          <h3>{html.escape(a['name'])}</h3>
+          <div class="posture-row"><span class="posture-label">allowed tools</span><span class="posture-value green">{html.escape(allowed)}</span></div>
+          <div class="posture-row"><span class="posture-label">model</span><span class="posture-value">{html.escape(a['model'])}</span></div>
+          <div class="posture-row"><span class="posture-label">enforcement</span><span class="posture-value purple">{html.escape(a['enforcement'])}</span></div>
+        </div>"""
+
+    std_rows = "".join(
+        f'<tr><td style="padding:6px 12px;color:#52525b">{html.escape(rule)}</td>'
+        f'<td style="padding:6px 12px;color:#a78bfa">{html.escape(ref)}</td></tr>'
+        for rule, ref in _STANDARDS.items()
+    )
+    return f"""
+    <div class="posture-grid">{cards}</div>
+    <table class="standards-table">
+      <thead><tr><th>rule</th><th>standard</th></tr></thead>
+      <tbody>{std_rows}</tbody>
+    </table>"""
 
 
 @app.post("/run")
