@@ -97,6 +97,7 @@
   <div class="tabs">
     <button class="tab active" onclick="showTab('events', this)">Event Feed</button>
     <button class="tab" onclick="showTab('posture', this)">Posture</button>
+    <button class="tab" onclick="showTab('stats', this)">Stats</button>
   </div>
 
   <div id="events" class="panel active">
@@ -109,6 +110,7 @@
           <th>event</th>
           <th>tool</th>
           <th>duration</th>
+          <th>severity</th>
           <th>risk</th>
           <th>standard</th>
         </tr>
@@ -125,6 +127,15 @@
     <div id="posture-content"
          hx-get="/posture/panel"
          hx-trigger="load"
+         hx-swap="innerHTML">
+      Loading…
+    </div>
+  </div>
+
+  <div id="stats" class="panel">
+    <div id="stats-content"
+         hx-get="/stats/panel"
+         hx-trigger="load, every 5s"
          hx-swap="innerHTML">
       Loading…
     </div>

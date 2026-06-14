@@ -26,6 +26,8 @@ def init_db() -> None:
                 duration_ms REAL,
                 flagged     INTEGER NOT NULL DEFAULT 0,
                 flag_reason TEXT,
+                severity    TEXT,
+                action      TEXT,
                 standards   TEXT,
                 timestamp   TEXT    NOT NULL
             )
@@ -34,6 +36,10 @@ def init_db() -> None:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(events)").fetchall()}
         if "standards" not in cols:
             conn.execute("ALTER TABLE events ADD COLUMN standards TEXT")
+        if "severity" not in cols:
+            conn.execute("ALTER TABLE events ADD COLUMN severity TEXT")
+        if "action" not in cols:
+            conn.execute("ALTER TABLE events ADD COLUMN action TEXT")
 
 
 def insert_event(event: dict) -> None:
@@ -42,10 +48,10 @@ def insert_event(event: dict) -> None:
             """
             INSERT INTO events
                 (trace_id, agent_name, event_type, tool, input, output,
-                 duration_ms, flagged, flag_reason, standards, timestamp)
+                 duration_ms, flagged, flag_reason, severity, action, standards, timestamp)
             VALUES
                 (:trace_id, :agent_name, :event_type, :tool, :input, :output,
-                 :duration_ms, :flagged, :flag_reason, :standards, :timestamp)
+                 :duration_ms, :flagged, :flag_reason, :severity, :action, :standards, :timestamp)
             """,
             {
                 "trace_id":    event["trace_id"],
@@ -57,6 +63,8 @@ def insert_event(event: dict) -> None:
                 "duration_ms": event.get("duration_ms"),
                 "flagged":     int(event.get("flagged", False)),
                 "flag_reason": event.get("flag_reason"),
+                "severity":    event.get("severity"),
+                "action":      event.get("action", "log"),
                 "standards":   json.dumps(event.get("standards") or []),
                 "timestamp":   event["timestamp"],
             },
@@ -69,6 +77,32 @@ def get_events(limit: int = 100) -> list[dict]:
             "SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
     return [_row_to_dict(r) for r in rows]
+
+
+def get_stats() -> dict:
+    with get_conn() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        flagged = conn.execute("SELECT COUNT(*) FROM events WHERE flagged = 1").fetchone()[0]
+        by_severity = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT severity, COUNT(*) FROM events WHERE flagged=1 AND severity IS NOT NULL GROUP BY severity"
+            ).fetchall()
+        }
+        by_agent = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT agent_name, COUNT(*) FROM events WHERE flagged=1 GROUP BY agent_name"
+            ).fetchall()
+        }
+        blocked = conn.execute("SELECT COUNT(*) FROM events WHERE action='block'").fetchone()[0]
+    return {
+        "total_events": total,
+        "flagged_events": flagged,
+        "blocked_events": blocked,
+        "by_severity": by_severity,
+        "by_agent": by_agent,
+    }
 
 
 def get_baseline(agent_name: str, event_type: str, exclude_trace_id: Optional[str] = None) -> Optional[float]:

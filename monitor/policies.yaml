@@ -1,0 +1,49 @@
+policies:
+  - id: no-prompt-injection
+    description: Abort pipeline on prompt injection attempts
+    applies_to: [researcher]
+    condition: prompt_injection
+    severity: critical
+    action: block
+
+  - id: no-pii-in-outputs
+    description: Flag any PII detected in agent inputs or outputs
+    applies_to: [researcher, summarizer]
+    condition: pii
+    severity: high
+    action: flag
+
+  - id: no-unexpected-tools
+    description: Flag agents calling tools outside their permitted set
+    applies_to: [researcher, summarizer]
+    condition: unexpected_tool
+    severity: high
+    action: flag
+
+  - id: no-ungrounded-output
+    description: Flag summarizer output not grounded in source results
+    applies_to: [summarizer]
+    condition: ungrounded
+    severity: medium
+    action: flag
+
+  - id: no-tool-repetition
+    description: Flag excessive repeated tool calls within a single trace
+    applies_to: [researcher, summarizer]
+    condition: tool_repetition
+    severity: medium
+    action: flag
+
+  - id: baseline-anomaly
+    description: Flag events that deviate significantly from their behavioral baseline
+    applies_to: [researcher, summarizer]
+    condition: baseline_anomaly
+    severity: low
+    action: flag
+
+  - id: slow-event
+    description: Flag events exceeding the absolute latency threshold
+    applies_to: [researcher, summarizer]
+    condition: slow
+    severity: low
+    action: flag

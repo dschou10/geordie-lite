@@ -1,5 +1,17 @@
 import re
+import yaml
+from pathlib import Path
 from .store import get_trace, get_baseline
+
+# --- Config ---
+
+_POLICIES_PATH = Path(__file__).parent / "policies.yaml"
+
+def _load_policies() -> list[dict]:
+    with open(_POLICIES_PATH) as f:
+        return yaml.safe_load(f)["policies"]
+
+_POLICIES = _load_policies()
 
 _PII_PATTERNS = [
     (re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"), "email address"),
@@ -9,7 +21,6 @@ _PII_PATTERNS = [
 _SLOW_THRESHOLD_MS = 5000
 _MAX_TOOL_CALLS = 3
 _BASELINE_ANOMALY_MULTIPLIER = 3.0
-_BASELINE_MIN_SAMPLES = 5  # don't flag until we have enough history
 
 _INJECTION_PATTERNS = re.compile(
     r"ignore (previous|prior|all) instructions?|"
@@ -23,14 +34,11 @@ _INJECTION_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-# Which tools each agent is permitted to call
 _ALLOWED_TOOLS: dict[str, set[str]] = {
     "researcher": {"search"},
     "summarizer": {"mock-llm", "claude-haiku-4-5-20251001"},
 }
 
-
-# Maps rule name → compliance standard reference
 _STANDARDS = {
     "pii":              "NIST PR.DS-5",
     "slow":             "internal SLO",
@@ -41,9 +49,21 @@ _STANDARDS = {
     "baseline_anomaly": "internal baseline",
 }
 
+SEVERITY_ORDER = ["low", "medium", "high", "critical"]
 
-def evaluate(event: dict) -> dict:
-    """Return {"flagged": bool, "reason": str | None, "standards": list[str]} for a single event."""
+_COMMON_WORDS = {
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was",
+    "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "may",
+    "new", "now", "old", "see", "two", "way", "who", "boy", "did", "she", "use",
+    "summary", "findings", "result", "results", "overview", "recent", "expert",
+    "analysis", "topic", "developments", "according", "based", "these", "their",
+    "this", "that", "with", "from", "they", "been", "have", "more", "also",
+}
+
+# --- Rule functions: return (condition_name, reason) | None ---
+
+def _rules(event: dict) -> list[tuple[str, str]]:
+    triggered = []
     checks = [
         ("pii",              _check_pii(event)),
         ("slow",             _check_slow(event)),
@@ -53,15 +73,46 @@ def evaluate(event: dict) -> dict:
         ("ungrounded",       _check_ungrounded_output(event)),
         ("baseline_anomaly", _check_baseline_anomaly(event)),
     ]
-    failures = [(name, reason) for name, (flagged, reason) in checks if flagged]
-    if failures:
-        return {
-            "flagged": True,
-            "reason": "; ".join(r for _, r in failures),
-            "standards": [_STANDARDS[name] for name, _ in failures],
-        }
-    return {"flagged": False, "reason": None, "standards": []}
+    for condition, (flagged, reason) in checks:
+        if flagged:
+            triggered.append((condition, reason))
+    return triggered
 
+
+def evaluate(event: dict) -> dict:
+    triggered = _rules(event)
+    if not triggered:
+        return {"flagged": False, "reason": None, "severity": None, "standards": [], "action": "log"}
+
+    agent = event.get("agent_name", "")
+    applicable_policies = [
+        p for p in _POLICIES
+        if p["condition"] in {c for c, _ in triggered}
+        and (not p.get("applies_to") or agent in p["applies_to"])
+    ]
+
+    if not applicable_policies:
+        # triggered rules but no matching policy for this agent — still flag
+        top_severity = "low"
+        action = "flag"
+    else:
+        top_severity = max(
+            (p["severity"] for p in applicable_policies),
+            key=lambda s: SEVERITY_ORDER.index(s),
+        )
+        # take the strongest action across matching policies
+        action = "block" if any(p["action"] == "block" for p in applicable_policies) else "flag"
+
+    return {
+        "flagged": True,
+        "reason": "; ".join(r for _, r in triggered),
+        "severity": top_severity,
+        "standards": [_STANDARDS[c] for c, _ in triggered if c in _STANDARDS],
+        "action": action,
+    }
+
+
+# --- Individual rule checks ---
 
 def _check_pii(event: dict) -> tuple[bool, str]:
     text = _extract_text(event.get("input")) + _extract_text(event.get("output"))
@@ -124,18 +175,7 @@ def _check_baseline_anomaly(event: dict) -> tuple[bool, str]:
     return False, ""
 
 
-_COMMON_WORDS = {
-    "the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was",
-    "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "may",
-    "new", "now", "old", "see", "two", "way", "who", "boy", "did", "she", "use",
-    "summary", "findings", "result", "results", "overview", "recent", "expert",
-    "analysis", "topic", "developments", "according", "based", "these", "their",
-    "this", "that", "with", "from", "they", "been", "have", "more", "also",
-}
-
-
 def _check_ungrounded_output(event: dict) -> tuple[bool, str]:
-    """Flag summarizer output that contains named entities not present in its input."""
     if event.get("agent_name") != "summarizer" or event.get("event_type") != "llm_call":
         return False, ""
     input_val = event.get("input") or {}

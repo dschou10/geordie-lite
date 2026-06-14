@@ -28,6 +28,8 @@ def emit(
     verdict = risk.evaluate(event)
     event["flagged"] = verdict["flagged"]
     event["flag_reason"] = verdict["reason"]
+    event["severity"] = verdict.get("severity")
+    event["action"] = verdict.get("action", "log")
     event["standards"] = verdict.get("standards", [])
     store.insert_event(event)
     return event
