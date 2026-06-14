@@ -499,13 +499,27 @@ def graph_panel():
     if s["status"] == "running":
         status_text = f"blocked — {s['current_agent']}" if s["aborted"] else f"running — {s['current_agent']}"
 
+    is_running = s["status"] == "running" and not s["aborted"]
+    r_pulse = 'class="pulse-node"' if is_running and s["current_agent"] == "researcher" else ""
+    s_pulse = 'class="pulse-node"' if is_running and s["current_agent"] == "summarizer" else ""
+
     return f"""
+    <style>
+      @keyframes pulse {{
+        0%   {{ filter: drop-shadow(0 0 3px #3b82f6); opacity: 1; }}
+        50%  {{ filter: drop-shadow(0 0 10px #3b82f6); opacity: 0.85; }}
+        100% {{ filter: drop-shadow(0 0 3px #3b82f6); opacity: 1; }}
+      }}
+      .pulse-node {{ animation: pulse 1s ease-in-out infinite; }}
+    </style>
     <div style="text-align:center;padding:32px 0 8px">
       <svg viewBox="0 0 520 140" width="520" height="140" xmlns="http://www.w3.org/2000/svg" style="font-family:'SF Mono',monospace">
         <!-- researcher node -->
-        <rect x="30" y="40" width="160" height="60" rx="8" fill="{node_color('researcher')}" stroke="{node_label_color('researcher')}" stroke-width="1.5"/>
-        <text x="110" y="67" text-anchor="middle" fill="{node_label_color('researcher')}" font-size="11" letter-spacing="1">{status_dot('researcher')} researcher</text>
-        <text x="110" y="86" text-anchor="middle" fill="#52525b" font-size="9">tool: search</text>
+        <g {r_pulse}>
+          <rect x="30" y="40" width="160" height="60" rx="8" fill="{node_color("researcher")}" stroke="{node_label_color("researcher")}" stroke-width="1.5"/>
+          <text x="110" y="67" text-anchor="middle" fill="{node_label_color("researcher")}" font-size="11" letter-spacing="1">{status_dot("researcher")} researcher</text>
+          <text x="110" y="86" text-anchor="middle" fill="#52525b" font-size="9">tool: search</text>
+        </g>
 
         <!-- arrow -->
         <line x1="190" y1="70" x2="330" y2="70" stroke="{edge_color}" stroke-width="1.5" marker-end="url(#arrow)"/>
@@ -516,9 +530,11 @@ def graph_panel():
         </defs>
 
         <!-- summarizer node -->
-        <rect x="330" y="40" width="160" height="60" rx="8" fill="{node_color('summarizer')}" stroke="{node_label_color('summarizer')}" stroke-width="1.5"/>
-        <text x="410" y="67" text-anchor="middle" fill="{node_label_color('summarizer')}" font-size="11" letter-spacing="1">{status_dot('summarizer')} summarizer</text>
-        <text x="410" y="86" text-anchor="middle" fill="#52525b" font-size="9">tool: llm</text>
+        <g {s_pulse}>
+          <rect x="330" y="40" width="160" height="60" rx="8" fill="{node_color("summarizer")}" stroke="{node_label_color("summarizer")}" stroke-width="1.5"/>
+          <text x="410" y="67" text-anchor="middle" fill="{node_label_color("summarizer")}" font-size="11" letter-spacing="1">{status_dot("summarizer")} summarizer</text>
+          <text x="410" y="86" text-anchor="middle" fill="#52525b" font-size="9">tool: llm</text>
+        </g>
 
         <!-- status label -->
         <text x="260" y="128" text-anchor="middle" fill="#3f3f46" font-size="9" letter-spacing="1">{status_text}</text>

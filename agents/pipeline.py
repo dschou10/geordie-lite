@@ -1,4 +1,5 @@
 import uuid
+import time
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from agents import researcher, summarizer
@@ -19,7 +20,10 @@ def _research_node(state: PipelineState) -> PipelineState:
 
 
 def _route_after_research(state: PipelineState) -> str:
-    return END if state.get("aborted") else "summarizer"
+    if state.get("aborted"):
+        return END
+    time.sleep(0.4)  # deliberate pause so graph animation is visible
+    return "summarizer"
 
 
 def _summarize_node(state: PipelineState) -> PipelineState:
