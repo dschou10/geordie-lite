@@ -1,9 +1,14 @@
+import os
 import time
 from monitor import tracer
 
 
 def _search(query: str) -> list[str]:
-    """Simulated search tool. Swap for a real search API if desired."""
+    if os.environ.get("TAVILY_API_KEY"):
+        from tavily import TavilyClient
+        client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+        response = client.search(query, max_results=3)
+        return [r["content"] for r in response.get("results", [])]
     time.sleep(0.05)
     return [
         f"Result 1 for '{query}': Overview of the topic.",
