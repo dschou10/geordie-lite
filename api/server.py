@@ -70,7 +70,18 @@ _pipeline_state: dict = {"status": "idle", "current_agent": None, "last_trace": 
 async def _broadcast(event_type: str, data: dict):
     payload = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
     for q in list(_sse_clients):
-        await q.put(payload)
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            # client is too slow — drop oldest message and enqueue new one
+            try:
+                q.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+            try:
+                q.put_nowait(payload)
+            except asyncio.QueueFull:
+                pass
 
 
 class RunRequest(BaseModel):
@@ -435,7 +446,7 @@ def stats_panel():
 
 @app.get("/stream")
 async def stream(request: Request):
-    queue: asyncio.Queue = asyncio.Queue()
+    queue: asyncio.Queue = asyncio.Queue(maxsize=50)
     _sse_clients.append(queue)
     async def generate():
         try:
