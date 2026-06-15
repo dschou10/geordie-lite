@@ -273,7 +273,14 @@
       es.addEventListener('pipeline_state', () => {
         htmx.trigger('#graph-content', 'refresh');
       });
-      es.onerror = () => setTimeout(connectSSE, 3000);
+      es.onopen = () => {
+        htmx.trigger('#feed', 'refresh');
+        htmx.trigger('#trace-feed', 'refresh');
+        htmx.trigger('#stats-content', 'refresh');
+        htmx.trigger('#graph-content', 'refresh');
+        htmx.trigger('#violations-feed', 'refresh');
+      };
+      es.onerror = () => { es.close(); setTimeout(connectSSE, 2000); };
     })();
   </script>
 </body>
