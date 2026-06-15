@@ -23,9 +23,10 @@ async def _startup():
     import asyncio as _asyncio
     loop = _asyncio.get_event_loop()
     def _on_event(event: dict):
+        aborted = event.get("action") == "block"
         _pipeline_state["current_agent"] = event["agent_name"]
-        _pipeline_state["status"] = "running"
-        _pipeline_state["aborted"] = event.get("action") == "block"
+        _pipeline_state["status"] = "idle" if aborted else "running"
+        _pipeline_state["aborted"] = aborted
         if event.get("flagged"):
             asyncio.run_coroutine_threadsafe(
                 _broadcast("flagged_event", {"agent": event["agent_name"], "severity": event.get("severity")}),
