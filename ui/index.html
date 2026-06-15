@@ -212,6 +212,18 @@
   </div>
 
   <script>
+    function renderStatus(data) {
+      if (!data || !data.trace_id) return;
+      const color = data.aborted ? '#f87171' : '#86efac';
+      const icon = data.aborted ? '✕' : '✓';
+      const clean = (data.summary || '').replace(/[#*`_]/g, '').replace(/\s+/g, ' ').trim();
+      const short = clean.length > 120 ? clean.slice(0, 120).replace(/\s\S+$/, '') + '…' : clean;
+      document.getElementById('status').innerHTML =
+        `<span style="color:${color}">${icon} trace ${data.trace_id.slice(0,8)}… — ${short}</span>`;
+    }
+
+    fetch('/last-run').then(r => r.json()).then(renderStatus).catch(() => {});
+
     function showTab(id, btn) {
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));

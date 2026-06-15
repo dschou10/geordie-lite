@@ -556,7 +556,23 @@ async def run(req: RunRequest):
     _pipeline_state.update({"status": "running", "current_agent": "researcher", "aborted": False})
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, run_pipeline, req.query)
-    _pipeline_state.update({"status": "idle", "current_agent": None, "last_trace": result["trace_id"]})
+    _pipeline_state.update({
+        "status": "idle", "current_agent": None,
+        "last_trace": result["trace_id"],
+        "last_summary": result["summary"],
+        "last_aborted": result["summary"].startswith("[aborted"),
+    })
     await _broadcast("trace_complete", {"trace_id": result["trace_id"], "summary": result["summary"]})
     await _broadcast("pipeline_state", {"status": "idle"})
     return result
+
+
+@app.get("/last-run")
+async def last_run():
+    if not _pipeline_state.get("last_trace"):
+        return {}
+    return {
+        "trace_id": _pipeline_state["last_trace"],
+        "summary": _pipeline_state.get("last_summary", ""),
+        "aborted": _pipeline_state.get("last_aborted", False),
+    }
