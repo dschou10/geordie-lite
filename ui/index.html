@@ -251,8 +251,10 @@
           const aborted = data.summary.startsWith('[aborted');
           const color = aborted ? '#f87171' : '#86efac';
           const icon = aborted ? '✕' : '✓';
+          const clean = data.summary.replace(/[#*`_]/g, '').replace(/\s+/g, ' ').trim();
+          const short = clean.length > 120 ? clean.slice(0, 120).replace(/\s\S+$/, '') + '…' : clean;
           evt.detail.target.innerHTML =
-            `<span style="color:${color}">${icon} trace ${data.trace_id.slice(0,8)}… — ${data.summary}</span>`;
+            `<span style="color:${color}">${icon} trace ${data.trace_id.slice(0,8)}… — ${short}</span>`;
         } catch(e) {}
       }
     });

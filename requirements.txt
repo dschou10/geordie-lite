@@ -7,6 +7,7 @@ pyyaml>=6.0
 # API
 fastapi>=0.115.0
 uvicorn>=0.30.0
+python-dotenv>=1.0.0
 
 # UI
 # HTMX is served via CDN, no package needed
