@@ -42,6 +42,20 @@ policies:
     severity: low
     action: flag
 
+  - id: no-unsafe-output
+    description: Flag outputs containing XSS, shell injection, SSRF, or template injection patterns
+    applies_to: [researcher, summarizer]
+    condition: output_handling
+    severity: high
+    action: flag
+
+  - id: no-prompt-leakage
+    description: Flag outputs that appear to reveal system prompt contents or instructions
+    applies_to: [researcher, summarizer]
+    condition: prompt_leakage
+    severity: high
+    action: flag
+
   - id: slow-event
     description: Flag events exceeding the absolute latency threshold
     applies_to: [researcher, summarizer]

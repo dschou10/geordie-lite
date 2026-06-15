@@ -42,12 +42,32 @@ _ALLOWED_TOOLS: dict[str, set[str]] = {
 _STANDARDS = {
     "pii":              "NIST PR.DS-5",
     "slow":             "internal SLO",
-    "tool_repetition":  "OWASP LLM07",
+    "tool_repetition":  "OWASP LLM06",
     "prompt_injection": "OWASP LLM01",
-    "unexpected_tool":  "OWASP LLM08",
+    "unexpected_tool":  "OWASP LLM06",
     "ungrounded":       "OWASP LLM09",
     "baseline_anomaly": "internal baseline",
+    "output_handling":  "OWASP LLM05",
+    "prompt_leakage":   "OWASP LLM07",
 }
+
+_OUTPUT_HANDLING_PATTERNS = re.compile(
+    r"<script[\s>]|javascript:|on\w+\s*=|"       # XSS
+    r";\s*(rm|curl|wget|bash|sh|python|nc)\b|"   # shell injection
+    r"file://|dict://|gopher://|"                  # SSRF schemes
+    r"\{\{.*?\}\}|\$\{.*?\}",                      # template injection
+    re.IGNORECASE,
+)
+
+_PROMPT_LEAKAGE_PATTERNS = re.compile(
+    r"my (system )?prompt (is|says|reads)|"
+    r"i (was|am) (instructed|told|programmed|configured) to|"
+    r"(system|hidden|original) instructions?|"
+    r"as per (my|the) (instructions?|prompt|configuration)|"
+    r"i must not (reveal|tell|share|disclose)|"
+    r"i('m| am) not (allowed|supposed|permitted) to (say|tell|reveal)",
+    re.IGNORECASE,
+)
 
 SEVERITY_ORDER = ["low", "medium", "high", "critical"]
 
@@ -72,6 +92,8 @@ def _rules(event: dict) -> list[tuple[str, str]]:
         ("unexpected_tool",  _check_unexpected_tool(event)),
         ("ungrounded",       _check_ungrounded_output(event)),
         ("baseline_anomaly", _check_baseline_anomaly(event)),
+        ("output_handling",  _check_output_handling(event)),
+        ("prompt_leakage",   _check_prompt_leakage(event)),
     ]
     for condition, (flagged, reason) in checks:
         if flagged:
@@ -190,6 +212,21 @@ def _check_ungrounded_output(event: dict) -> tuple[bool, str]:
     if ungrounded:
         sample = ", ".join(sorted(set(ungrounded))[:3])
         return True, f"ungrounded output: terms not in source ({sample})"
+    return False, ""
+
+
+def _check_output_handling(event: dict) -> tuple[bool, str]:
+    output_text = _extract_text(event.get("output"))
+    if _OUTPUT_HANDLING_PATTERNS.search(output_text):
+        match = _OUTPUT_HANDLING_PATTERNS.search(output_text)
+        return True, f"unsafe output pattern detected: '{match.group(0)[:40]}'"
+    return False, ""
+
+
+def _check_prompt_leakage(event: dict) -> tuple[bool, str]:
+    output_text = _extract_text(event.get("output"))
+    if _PROMPT_LEAKAGE_PATTERNS.search(output_text):
+        return True, "possible system prompt leakage in output"
     return False, ""
 
 
