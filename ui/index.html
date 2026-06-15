@@ -138,7 +138,7 @@
       </thead>
       <tbody id="feed"
              hx-get="/events/rows"
-             hx-trigger="load, every 5s, refresh from:body"
+             hx-trigger="load, refresh from:body"
              hx-swap="innerHTML">
       </tbody>
     </table>
@@ -152,7 +152,7 @@
       </thead>
       <tbody id="trace-feed"
              hx-get="/traces/rows"
-             hx-trigger="load, every 5s, refresh from:body"
+             hx-trigger="load, refresh from:body"
              hx-swap="innerHTML">
       </tbody>
     </table>
@@ -207,7 +207,7 @@
   <div id="stats" class="panel">
     <div id="stats-content"
          hx-get="/stats/panel"
-         hx-trigger="load, every 5s, refresh from:body"
+         hx-trigger="load, refresh from:body"
          hx-swap="innerHTML">Loading…</div>
   </div>
 
